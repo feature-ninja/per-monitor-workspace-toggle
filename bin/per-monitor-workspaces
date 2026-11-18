@@ -34,6 +34,12 @@ print_status() {
 # The flag only points at the plugin's Lua, so updating the plugin needs no
 # re-toggle, and removing the plugin leaves a flag that loads nothing.
 off() {
+  # Saved here rather than left to the Lua, which only runs if Hyprland loads
+  # the flag; on() would otherwise find no copy and delete the original.
+  if [[ ! -f $saved_blocks_file && -f $blocks_file ]]; then
+    cp -p "$blocks_file" "$saved_blocks_file"
+  fi
+
   mkdir -p "$(dirname "$flag")"
   cat >"$flag" <<EOF
 -- Written by per-monitor-workspaces; delete to turn per-monitor workspaces back on.
