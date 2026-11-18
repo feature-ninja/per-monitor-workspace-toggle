@@ -6,10 +6,14 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: per-monitor-workspaces [toggle|on|off|status]" >&2
+  echo "Usage: per-monitor-workspaces [toggle|on|off|status|menu]" >&2
 }
 
 plugin_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+script="$plugin_dir/bin/per-monitor-workspaces"
+menu_file="$HOME/.config/omarchy/extensions/omarchy-menu.jsonc"
+menu_begin="  // >>> per-monitor-workspaces: written by the plugin, edits here are replaced"
+menu_end="  // <<< per-monitor-workspaces"
 state_dir="$HOME/.local/state/omarchy"
 flag="$state_dir/toggles/hypr/per-monitor-workspaces-off.lua"
 blocks="$state_dir/monitor-workspaces"
@@ -47,9 +51,50 @@ on() {
   fi
 }
 
+# Omarchy's menu only reads its defaults and the user's extension file, so the
+# Trigger > Toggle rows live in a marked block there. Rewriting the block keeps
+# the script path current when the plugin moves, and the rows hide themselves
+# once the script is gone.
+menu() {
+  if [[ ! -f $menu_file ]]; then
+    mkdir -p "$(dirname "$menu_file")"
+    printf '{\n}\n' >"$menu_file"
+  fi
+
+  local status="\$('$script' status 2>/dev/null)"
+  local block
+  block=$(cat <<EOF
+$menu_begin
+  "trigger.toggle.per-monitor-workspaces-global": {"icon":"󰍹","label":"Global Workspaces","when":"[[ $status == on ]]","action":"'$script' toggle"},
+  "trigger.toggle.per-monitor-workspaces-per-monitor": {"icon":"󰍺","label":"Per-monitor Workspaces","when":"[[ $status == off ]]","action":"'$script' toggle"},
+$menu_end
+EOF
+  )
+
+  local next
+  next=$(awk -v begin="$menu_begin" -v end="$menu_end" -v block="$block" '
+    $0 == begin { skipping = 1; next }
+    skipping { if ($0 == end) skipping = 0; next }
+    { print }
+    !inserted && /^[[:space:]]*\{[[:space:]]*$/ { print block; inserted = 1 }
+    END { if (!inserted) exit 1 }
+  ' "$menu_file") || {
+    echo "No opening { line in $menu_file, menu rows not added" >&2
+    return 1
+  }
+
+  if [[ $next != "$(cat "$menu_file")" ]]; then
+    printf '%s\n' "$next" >"$menu_file"
+  fi
+}
+
 case "${1:-toggle}" in
   status)
     enabled && echo on || echo off
+    exit 0
+    ;;
+  menu)
+    menu
     exit 0
     ;;
   on) on ;;
