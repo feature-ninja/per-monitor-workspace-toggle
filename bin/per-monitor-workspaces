@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Turn Omarchy's per-monitor workspaces (omacom/omarchy#15655) on or off.
+# Off numbers workspaces 1-10 across all monitors, as Omarchy did before.
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: per-monitor-workspaces [toggle|on|off|status]" >&2
+}
+
+plugin_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+state_dir="$HOME/.local/state/omarchy"
+flag="$state_dir/toggles/hypr/per-monitor-workspaces-off.lua"
+blocks="$state_dir/monitor-workspaces"
+saved_blocks="$blocks.per-monitor"
+
+enabled() {
+  [[ ! -f $flag ]]
+}
+
+# The flag only points at the plugin's Lua, so updating the plugin needs no
+# re-toggle, and removing the plugin leaves a flag that loads nothing.
+off() {
+  mkdir -p "$(dirname "$flag")"
+  cat >"$flag" <<EOF
+-- Written by per-monitor-workspaces; delete to turn per-monitor workspaces back on.
+local path = [==[$plugin_dir/hypr/global-workspaces.lua]==]
+local file = io.open(path, "r")
+if file then
+  file:close()
+  dofile(path)
+end
+EOF
+}
+
+# While off, the bar's block file holds a flat stand-in, and the real one waits
+# beside it. It has to be back before Hyprland reloads and reads it.
+on() {
+  enabled && return
+  rm -f "$flag"
+
+  if [[ -f $saved_blocks ]]; then
+    mv -f "$saved_blocks" "$blocks"
+  else
+    rm -f "$blocks"
+  fi
+}
+
+case "${1:-toggle}" in
+  status)
+    enabled && echo on || echo off
+    exit 0
+    ;;
+  on) on ;;
+  off) off ;;
+  toggle)
+    if enabled; then
+      off
+    else
+      on
+    fi
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
+
+workspace_ids() {
+  hyprctl workspaces -j 2>/dev/null | jq -c '[.[].id] | sort' || true
+}
+
+before=$(workspace_ids)
+omarchy-restart-hyprctl
+enabled && echo on || echo off
+
+# Switching renumbers workspaces, and Quickshell keeps listing the old numbers
+# in the bar until it restarts.
+if [[ $(workspace_ids) != "$before" ]]; then
+  omarchy-restart-shell >/dev/null 2>&1 &
+  disown
+fi

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "feature-ninja.per-monitor-workspaces",
+  "name": "Per-monitor Workspaces Toggle",
+  "version": "0.1.0",
+  "author": "feature-ninja",
+  "license": "MIT",
+  "description": "Switch between Omarchy's per-monitor workspaces, where every monitor has its own 1-10, and workspaces numbered 1-10 across all monitors.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Per-monitor Workspaces",
+    "description": "Click to switch between per-monitor and global workspaces.",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left"
+  }
+}
