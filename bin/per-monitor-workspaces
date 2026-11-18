@@ -14,13 +14,21 @@ script="$plugin_dir/bin/per-monitor-workspaces"
 menu_file="$HOME/.config/omarchy/extensions/omarchy-menu.jsonc"
 menu_begin="  // >>> per-monitor-workspaces: written by the plugin, edits here are replaced"
 menu_end="  // <<< per-monitor-workspaces"
-state_dir="$HOME/.local/state/omarchy"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
 flag="$state_dir/toggles/hypr/per-monitor-workspaces-off.lua"
-blocks="$state_dir/monitor-workspaces"
-saved_blocks="$blocks.per-monitor"
+blocks_file="$state_dir/monitor-workspaces"
+saved_blocks_file="$blocks_file.per-monitor"
 
 enabled() {
   [[ ! -f $flag ]]
+}
+
+print_status() {
+  if enabled; then
+    echo on
+  else
+    echo off
+  fi
 }
 
 # The flag only points at the plugin's Lua, so updating the plugin needs no
@@ -44,10 +52,10 @@ on() {
   enabled && return
   rm -f "$flag"
 
-  if [[ -f $saved_blocks ]]; then
-    mv -f "$saved_blocks" "$blocks"
+  if [[ -f $saved_blocks_file ]]; then
+    mv -f "$saved_blocks_file" "$blocks_file"
   else
-    rm -f "$blocks"
+    rm -f "$blocks_file"
   fi
 }
 
@@ -56,23 +64,29 @@ on() {
 # the script path current when the plugin moves, and the rows hide themselves
 # once the script is gone.
 menu() {
+  # The path lands unescaped inside a JSON string and a single-quoted shell word.
+  if [[ $script == *[\"\'\\]* ]]; then
+    echo "Plugin path contains a quote or backslash, menu rows not added: $script" >&2
+    return 1
+  fi
+
   if [[ ! -f $menu_file ]]; then
     mkdir -p "$(dirname "$menu_file")"
     printf '{\n}\n' >"$menu_file"
   fi
 
-  local status="\$('$script' status 2>/dev/null)"
+  local status_check="\$('$script' status 2>/dev/null)"
   local block
   block=$(cat <<EOF
 $menu_begin
-  "trigger.toggle.per-monitor-workspaces-global": {"icon":"󰍹","label":"Global Workspaces","when":"[[ $status == on ]]","action":"'$script' toggle"},
-  "trigger.toggle.per-monitor-workspaces-per-monitor": {"icon":"󰍺","label":"Per-monitor Workspaces","when":"[[ $status == off ]]","action":"'$script' toggle"},
+  "trigger.toggle.per-monitor-workspaces-global": {"icon":"󰍹","label":"Global Workspaces","when":"[[ $status_check == on ]]","action":"'$script' toggle"},
+  "trigger.toggle.per-monitor-workspaces-per-monitor": {"icon":"󰍺","label":"Per-monitor Workspaces","when":"[[ $status_check == off ]]","action":"'$script' toggle"},
 $menu_end
 EOF
   )
 
-  local next
-  next=$(awk -v begin="$menu_begin" -v end="$menu_end" -v block="$block" '
+  local updated
+  updated=$(awk -v begin="$menu_begin" -v end="$menu_end" -v block="$block" '
     $0 == begin { skipping = 1; next }
     skipping { if ($0 == end) skipping = 0; next }
     { print }
@@ -83,14 +97,14 @@ EOF
     return 1
   }
 
-  if [[ $next != "$(cat "$menu_file")" ]]; then
-    printf '%s\n' "$next" >"$menu_file"
+  if [[ $updated != "$(cat "$menu_file")" ]]; then
+    printf '%s\n' "$updated" >"$menu_file"
   fi
 }
 
 case "${1:-toggle}" in
   status)
-    enabled && echo on || echo off
+    print_status
     exit 0
     ;;
   menu)
@@ -118,7 +132,7 @@ workspace_ids() {
 
 before=$(workspace_ids)
 omarchy-restart-hyprctl
-enabled && echo on || echo off
+print_status
 
 # Switching renumbers workspaces, and Quickshell keeps listing the old numbers
 # in the bar until it restarts.

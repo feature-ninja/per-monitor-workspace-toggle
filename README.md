@@ -6,7 +6,7 @@ Omarchy gives every monitor its own workspaces 1-10 since [omacom/omarchy#15655]
 
 - Click the bar icon. A single monitor icon means global workspaces, a double one means per-monitor.
 - Open the Omarchy menu at Trigger > Toggle and pick Global Workspaces or Per-monitor Workspaces.
-- From a terminal or a keybinding, run `~/.config/omarchy/plugins/feature-ninja.per-monitor-workspaces/bin/per-monitor-workspaces [toggle|on|off|status]`.
+- From a terminal or a keybinding, run `~/.config/omarchy/plugins/feature-ninja.per-monitor-workspaces/bin/per-monitor-workspaces [toggle|on|off|status]`. `menu` rewrites the Trigger > Toggle rows, which the plugin also does on every shell start.
 
 ## What off changes
 
@@ -16,8 +16,7 @@ Omarchy gives every monitor its own workspaces 1-10 since [omacom/omarchy#15655]
 - Omarchy stops renumbering workspaces on reloads and hotplugs.
 - Every monitor's bar lists workspaces 1-10.
 - Workspaces left at 11 and up move into free numbers 1-10.
-
-`Super + Shift + Ctrl + Arrows` (move window to monitor) stays in both modes.
+- `Super + Shift + Ctrl + Arrows` (move window to monitor), which per-monitor mode added, is unbound.
 
 ## How it works
 
@@ -29,5 +28,7 @@ A switch that renumbers workspaces restarts the Omarchy shell, because Quickshel
 
 ## Caveats
 
-- While off, the plugin's bindings replace any custom bindings you made on the same keys in `~/.config/hypr/bindings.lua`.
+- While off, the plugin's bindings replace any custom bindings you made on the same keys in `~/.config/hypr/bindings.lua`, and your own `Super + Shift + Ctrl + Arrows` bindings are removed.
+- A workspace created above 10 while off, such as by a window rule, shows in the bar after 1-10 until the next reload moves it into a free slot.
+- The menu rows are English only, because the menu file has no translation support.
 - Saved per-workspace layouts (scrolling, floating) are keyed by number, so a renumbered workspace loses its layout. Omarchy has the same gap.

@@ -9,6 +9,8 @@ end
 
 local paths = require("default.hypr.paths")
 
+local SLOTS = workspaces.slots
+
 local BLOCKS_FILE = paths.state_home .. "/omarchy/monitor-workspaces"
 local SAVED_BLOCKS_FILE = BLOCKS_FILE .. ".per-monitor"
 
@@ -59,20 +61,21 @@ local function flatten_blocks()
   end
 end
 
--- Per-monitor mode leaves workspaces at 11 and up, which Super + 1-0 can no
--- longer reach. Bring each into 1-10, on its own slot when that is free.
+-- Per-monitor mode leaves workspaces past the first block, which Super + 1-0
+-- can no longer reach. Bring each into the first block, on its own slot when
+-- that is free.
 local function compact()
   local strays = {}
   for _, workspace in ipairs(hl.get_workspaces()) do
-    if not workspace.special and workspace.id > 10 then
+    if not workspace.special and workspace.id > SLOTS then
       strays[#strays + 1] = workspace.id
     end
   end
   table.sort(strays)
 
   for _, id in ipairs(strays) do
-    local candidates = { (id - 1) % 10 + 1 }
-    for slot = 1, 10 do
+    local candidates = { (id - 1) % SLOTS + 1 }
+    for slot = 1, SLOTS do
       candidates[#candidates + 1] = slot
     end
 
@@ -125,4 +128,9 @@ end
 
 for _, binding in ipairs(bindings) do
   o.rebind(binding[1], binding[2], binding[3])
+end
+
+-- Per-monitor mode added these; global mode had nothing on them.
+for _, direction in ipairs({ "LEFT", "RIGHT", "UP", "DOWN" }) do
+  hl.unbind("SUPER + SHIFT + CTRL + " .. direction)
 end

@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import qs.Ui
@@ -19,11 +18,6 @@ BarWidget {
     if (!status.running) status.running = true
   }
 
-  // Detached, because a toggle that renumbers workspaces restarts the shell.
-  function toggle() {
-    Quickshell.execDetached([root.script, "toggle"])
-  }
-
   Process {
     id: status
     command: [root.script, "status"]
@@ -31,6 +25,8 @@ BarWidget {
       onStreamFinished: root.perMonitor = this.text.trim() !== "off"
     }
   }
+
+  Translations { id: strings; directory: Qt.resolvedUrl("i18n") }
 
   Component.onCompleted: root.readStatus()
 
@@ -48,7 +44,8 @@ BarWidget {
     bar: root.bar
     text: root.perMonitor ? "󰍺" : "󰍹"
     active: !root.perMonitor
-    tooltipText: root.perMonitor ? "Workspaces per monitor (click for global)" : "Workspaces across all monitors (click for per monitor)"
-    onPressed: function() { root.toggle() }
+    tooltipText: root.perMonitor ? strings.t("tooltip.perMonitor") : strings.t("tooltip.global")
+    // bar.run detaches, so the shell restart a renumbering toggle triggers cannot cut it short.
+    onPressed: function() { if (root.bar) root.bar.run(Util.shellQuote(root.script) + " toggle") }
   }
 }
