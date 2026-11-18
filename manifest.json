@@ -7,12 +7,10 @@
   "license": "MIT",
   "description": "Switch between Omarchy's per-monitor workspaces, where every monitor has its own 1-10, and workspaces numbered 1-10 across all monitors.",
   "kinds": [
-    "bar-widget",
-    "service"
+    "bar-widget"
   ],
   "entryPoints": {
-    "barWidget": "BarWidget.qml",
-    "service": "MenuService.qml"
+    "barWidget": "BarWidget.qml"
   },
   "barWidget": {
     "displayName": "Per-monitor Workspaces",

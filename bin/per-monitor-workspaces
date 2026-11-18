@@ -6,7 +6,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: per-monitor-workspaces [toggle|on|off|status|menu]" >&2
+  echo "Usage: per-monitor-workspaces [toggle|on|off|status|menu install|menu remove]" >&2
 }
 
 plugin_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -60,10 +60,29 @@ on() {
 }
 
 # Omarchy's menu only reads its defaults and the user's extension file, so the
-# Trigger > Toggle rows live in a marked block there. Rewriting the block keeps
-# the script path current when the plugin moves, and the rows hide themselves
-# once the script is gone.
-menu() {
+# Trigger > Toggle rows live in a marked block there, added and removed only on
+# request. Installing again rewrites the block, which keeps the script path
+# current when the plugin moves.
+menu_write() {
+  local block="$1"
+  local updated
+  updated=$(awk -v begin="$menu_begin" -v end="$menu_end" -v block="$block" '
+    $0 == begin { skipping = 1; next }
+    skipping { if ($0 == end) skipping = 0; next }
+    { print }
+    block != "" && !inserted && /^[[:space:]]*\{[[:space:]]*$/ { print block; inserted = 1 }
+    END { if (block != "" && !inserted) exit 1 }
+  ' "$menu_file") || {
+    echo "No opening { line in $menu_file, menu rows not added" >&2
+    return 1
+  }
+
+  if [[ $updated != "$(cat "$menu_file")" ]]; then
+    printf '%s\n' "$updated" >"$menu_file"
+  fi
+}
+
+menu_install() {
   # The path lands unescaped inside a JSON string and a single-quoted shell word.
   if [[ $script == *[\"\'\\]* ]]; then
     echo "Plugin path contains a quote or backslash, menu rows not added: $script" >&2
@@ -76,30 +95,20 @@ menu() {
   fi
 
   local status_check="\$('$script' status 2>/dev/null)"
-  local block
-  block=$(cat <<EOF
+  menu_write "$(cat <<EOF
 $menu_begin
   "trigger.toggle.per-monitor-workspaces-global": {"icon":"󰍹","label":"Global Workspaces","when":"[[ $status_check == on ]]","action":"'$script' toggle"},
   "trigger.toggle.per-monitor-workspaces-per-monitor": {"icon":"󰍺","label":"Per-monitor Workspaces","when":"[[ $status_check == off ]]","action":"'$script' toggle"},
 $menu_end
 EOF
-  )
+  )"
+  echo "Added Trigger > Toggle rows to $menu_file"
+}
 
-  local updated
-  updated=$(awk -v begin="$menu_begin" -v end="$menu_end" -v block="$block" '
-    $0 == begin { skipping = 1; next }
-    skipping { if ($0 == end) skipping = 0; next }
-    { print }
-    !inserted && /^[[:space:]]*\{[[:space:]]*$/ { print block; inserted = 1 }
-    END { if (!inserted) exit 1 }
-  ' "$menu_file") || {
-    echo "No opening { line in $menu_file, menu rows not added" >&2
-    return 1
-  }
-
-  if [[ $updated != "$(cat "$menu_file")" ]]; then
-    printf '%s\n' "$updated" >"$menu_file"
-  fi
+menu_remove() {
+  [[ -f $menu_file ]] || return 0
+  menu_write ""
+  echo "Removed Trigger > Toggle rows from $menu_file"
 }
 
 case "${1:-toggle}" in
@@ -108,7 +117,14 @@ case "${1:-toggle}" in
     exit 0
     ;;
   menu)
-    menu
+    case "${2:-}" in
+      install) menu_install ;;
+      remove) menu_remove ;;
+      *)
+        usage
+        exit 1
+        ;;
+    esac
     exit 0
     ;;
   on) on ;;
