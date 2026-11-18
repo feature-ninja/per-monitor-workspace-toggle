@@ -65,17 +65,31 @@ on() {
 # current when the plugin moves.
 menu_write() {
   local block="$1"
-  local updated
+  local updated status=0
   updated=$(awk -v begin="$menu_begin" -v end="$menu_end" -v block="$block" '
     $0 == begin { skipping = 1; next }
     skipping { if ($0 == end) skipping = 0; next }
     { print }
     block != "" && !inserted && /^[[:space:]]*\{[[:space:]]*$/ { print block; inserted = 1 }
-    END { if (block != "" && !inserted) exit 1 }
-  ' "$menu_file") || {
+    END {
+      if (skipping) exit 2
+      if (block != "" && !inserted) exit 1
+    }
+  ' "$menu_file") || status=$?
+
+  # Without its end marker the block's extent is unknown, and guessing would
+  # drop whatever the user keeps after it.
+  if ((status == 2)); then
+    echo "$menu_file has the plugin's start marker but not its end marker, left unchanged." >&2
+    echo "Restore this line after the plugin's rows, or delete the rows and the start marker:" >&2
+    echo "$menu_end" >&2
+    return 1
+  fi
+
+  if ((status != 0)); then
     echo "No opening { line in $menu_file, menu rows not added" >&2
     return 1
-  }
+  fi
 
   if [[ $updated != "$(cat "$menu_file")" ]]; then
     printf '%s\n' "$updated" >"$menu_file"
